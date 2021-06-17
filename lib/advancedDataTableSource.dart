@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 typedef LoadPageCallback = Future<RemoteDataSourceDetails<F>> Function<F>(
@@ -6,11 +8,16 @@ typedef LoadPageCallback = Future<RemoteDataSourceDetails<F>> Function<F>(
 abstract class AdvancedDataTableSource<T> extends DataTableSource {
   bool get initialRequestCompleted => lastDetails == null ? false : true;
   RemoteDataSourceDetails<T>? lastDetails;
-
+  final StreamController<bool> _refreshStream = StreamController.broadcast();
+  Stream get refreshStream => _refreshStream.stream;
   Future<RemoteDataSourceDetails<T>> getNextPage(NextPageRequest pageRequest);
 
   @override
   int get rowCount => lastDetails?.totalRows ?? 0;
+
+  void refresh() {
+    _refreshStream.add(true);
+  }
 
   @override
   DataRow? getRow(int index) => null;

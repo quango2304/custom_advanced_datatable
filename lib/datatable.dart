@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
@@ -258,6 +259,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   //Used to load the next page if needed
   late Future<int> loadNextPage;
   final Map<int, DataRow?> _rows = <int, DataRow?>{};
+  late StreamSubscription refreshStreamSub;
 
   @override
   void initState() {
@@ -267,11 +269,21 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
         0;
     widget.source.addListener(_handleDataSourceChanged);
     setLoadNextPage(firstRowIndex: 0);
-
+    refreshListener();
     _rowCount = widget.source.rowCount;
     _rowCountApproximate = widget.source.isRowCountApproximate;
     _selectedRowCount = widget.source.selectedRowCount;
     _rows.clear();
+  }
+
+  void refreshListener() {
+    refreshStreamSub = widget.source.refreshStream.listen((event) {
+      setState(() {
+        _firstRowIndex = 0;
+        setLoadNextPage(firstRowIndex: 0);
+        _rows.clear();
+      });
+    });
   }
 
   @override
@@ -291,6 +303,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   @override
   void dispose() {
     widget.source.removeListener(_handleDataSourceChanged);
+    refreshStreamSub.cancel();
     super.dispose();
   }
 
