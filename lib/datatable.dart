@@ -437,19 +437,9 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
       return FutureBuilder<int>(
         future: loadNextPage,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done ||
-              snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.done) {
             _rowCount = snapshot.data ?? 0;
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                buildTableWhenReady(constraints),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  widget.loadingWidget != null
-                      ? widget.loadingWidget!()
-                      : CircularProgressIndicator()
-              ],
-            );
+            return buildTableWhenReady(constraints);
           } else {
             if (snapshot.hasError) {
               if (widget.errorWidget != null) {
