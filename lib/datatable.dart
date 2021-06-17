@@ -104,6 +104,7 @@ class AdvancedPaginatedDataTable extends StatefulWidget {
         super(key: key);
 
   final DataRow? Function(int index) getRow;
+
   /// Add empty/blank lines to the table if not enough records are present
   /// If the source doesnt have enough data add empty/blank lines to fill a page
   /// Default true
@@ -256,6 +257,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   late int _rowCount;
   late bool _rowCountApproximate;
   int _selectedRowCount = 0;
+
   //Used to load the next page if needed
   late Future<int> loadNextPage;
   final Map<int, DataRow?> _rows = <int, DataRow?>{};
@@ -435,9 +437,19 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
       return FutureBuilder<int>(
         future: loadNextPage,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.connectionState == ConnectionState.done ||
+              snapshot.connectionState == ConnectionState.waiting) {
             _rowCount = snapshot.data ?? 0;
-            return buildTableWhenReady(constraints);
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                buildTableWhenReady(constraints),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  widget.loadingWidget != null
+                      ? widget.loadingWidget!()
+                      : CircularProgressIndicator()
+              ],
+            );
           } else {
             if (snapshot.hasError) {
               if (widget.errorWidget != null) {
@@ -513,9 +525,8 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
         );
       }).toList();
       footerWidgets.addAll(<Widget>[
-        Container(
-            width:
-                14.0), // to match trailing padding in case we overflow and end up scrolling
+        Container(width: 14.0),
+        // to match trailing padding in case we overflow and end up scrolling
         Text(localizations.rowsPerPageTitle),
         ConstrainedBox(
           constraints: const BoxConstraints(
