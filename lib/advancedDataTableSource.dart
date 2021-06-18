@@ -10,6 +10,8 @@ abstract class AdvancedDataTableSource<T> extends DataTableSource {
   RemoteDataSourceDetails<T>? lastDetails;
   final StreamController<bool> _refreshStream = StreamController.broadcast();
   Stream get refreshStream => _refreshStream.stream;
+  final StreamController<bool> _refreshCurrentPageStream = StreamController.broadcast();
+  Stream get refreshCurrentPageStream => _refreshCurrentPageStream.stream;
   Future<RemoteDataSourceDetails<T>> getNextPage(NextPageRequest pageRequest);
 
   @override
@@ -17,6 +19,10 @@ abstract class AdvancedDataTableSource<T> extends DataTableSource {
 
   void refresh() {
     _refreshStream.add(true);
+  }
+
+  void refreshCurrentPage() {
+    _refreshCurrentPageStream.add(true);
   }
 
   @override

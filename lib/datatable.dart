@@ -262,6 +262,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   late Future<int> loadNextPage;
   final Map<int, DataRow?> _rows = <int, DataRow?>{};
   late StreamSubscription refreshStreamSub;
+  late StreamSubscription refreshCurrentPageStreamSub;
   int tableKey = 9999;
 
   @override
@@ -273,6 +274,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
     widget.source.addListener(_handleDataSourceChanged);
     setLoadNextPage(firstRowIndex: 0);
     refreshListener();
+    refreshCurrentPageListener();
     _rowCount = widget.source.rowCount;
     _rowCountApproximate = widget.source.isRowCountApproximate;
     _selectedRowCount = widget.source.selectedRowCount;
@@ -284,6 +286,15 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
       setState(() {
         _firstRowIndex = 0;
         setLoadNextPage(firstRowIndex: 0);
+        _rows.clear();
+      });
+    });
+  }
+
+  void refreshCurrentPageListener() {
+    refreshCurrentPageStreamSub = widget.source.refreshCurrentPageStream.listen((event) {
+      setState(() {
+        setLoadNextPage(firstRowIndex: _firstRowIndex);
         _rows.clear();
       });
     });
@@ -307,6 +318,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   void dispose() {
     widget.source.removeListener(_handleDataSourceChanged);
     refreshStreamSub.cancel();
+    refreshCurrentPageStreamSub.cancel();
     super.dispose();
   }
 
