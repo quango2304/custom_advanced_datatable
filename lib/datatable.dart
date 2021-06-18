@@ -262,6 +262,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   late Future<int> loadNextPage;
   final Map<int, DataRow?> _rows = <int, DataRow?>{};
   late StreamSubscription refreshStreamSub;
+  int tableKey = 9999;
 
   @override
   void initState() {
@@ -378,15 +379,9 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
     final result = <DataRow>[];
     final nextPageFirstRowIndex = firstRowIndex + rowsPerPage;
     var haveProgressIndicator = false;
-    print('firstRow: $firstRowIndex');
-    print('nextPageFirstRowIndex: $nextPageFirstRowIndex');
     for (var index = firstRowIndex; index < nextPageFirstRowIndex; index += 1) {
       DataRow? row;
       if (index < _rowCount || _rowCountApproximate) {
-        print(
-            'index - x: $index - ${(firstRowIndex ~/ rowsPerPage) * rowsPerPage}');
-        print(
-            'index - start: $index - $firstRowIndex = ${index - firstRowIndex}');
         row = _rows.putIfAbsent(
             index,
             () => widget.getRow(index -
@@ -427,19 +422,30 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
       !_rowCountApproximate &&
       (_firstRowIndex + widget.rowsPerPage >= _rowCount);
 
-  final GlobalKey _tableKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
     //Adjusted to first request the data followed by rendering the original table
+    final loadingWidget = widget.loadingWidget != null ?
+       widget.loadingWidget!() :  Center(
+        child: CircularProgressIndicator(),
+      );
+
     return LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
       return FutureBuilder<int>(
         future: loadNextPage,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
+          final isDone = snapshot.connectionState == ConnectionState.done;
+          final isWaiting = snapshot.connectionState == ConnectionState.waiting;
+          if (isDone || isWaiting) {
             _rowCount = snapshot.data ?? 0;
-            return buildTableWhenReady(constraints);
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                buildTableWhenReady(constraints, shouldClearRow: isDone),
+                if(isWaiting)loadingWidget
+              ],
+            );
           } else {
             if (snapshot.hasError) {
               if (widget.errorWidget != null) {
@@ -451,13 +457,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
                 );
               }
             } else {
-              if (widget.loadingWidget != null) {
-                return widget.loadingWidget!();
-              } else {
-                return Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
+              return loadingWidget;
             }
           }
         },
@@ -465,16 +465,104 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
     });
   }
 
-  ///Original build method from the Flutter PageinatedDataTable
-  Widget buildTableWhenReady(BoxConstraints constraints) {
-    assert(debugCheckHasMaterialLocalizations(context));
+  ///Original build method from the Flutter PaginatedDataTable
+  Widget buildTableWhenReady(BoxConstraints constraints, {bool shouldClearRow = false}) {
     final themeData = Theme.of(context);
-    final localizations = MaterialLocalizations.of(context);
-    // HEADER
-    final headerWidgets = <Widget>[];
+    final footerTextStyle = themeData.textTheme.caption;
+    if(shouldClearRow) {
+      _rows.clear();
+    }
+    assert(debugCheckHasMaterialLocalizations(context));
+    final headerWidgets = _buildHeaders();
+    final footerWidgets = _buildFooters();
+    return Card(
+      key: ValueKey(tableKey),
+      semanticContainer: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (headerWidgets.isNotEmpty)
+            Semantics(
+              container: true,
+              child: DefaultTextStyle(
+                // These typographic styles aren't quite the regular ones. We pick the closest ones from the regular
+                // list and then tweak them appropriately.
+                // See https://material.io/design/components/data-tables.html#tables-within-cards
+                style: _selectedRowCount > 0
+                    ? themeData.textTheme.subtitle1!
+                        .copyWith(color: themeData.colorScheme.secondary)
+                    : themeData.textTheme.headline6!
+                        .copyWith(fontWeight: FontWeight.w400),
+                child: IconTheme.merge(
+                  data: const IconThemeData(
+                    opacity: 0.54,
+                  ),
+                  child: Ink(
+                    height: 64.0,
+                    color: _selectedRowCount > 0
+                        ? themeData.secondaryHeaderColor
+                        : null,
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(
+                          start: _startPadding, end: 14.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: headerWidgets,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            dragStartBehavior: widget.dragStartBehavior,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
+                columns: widget.columns,
+                sortColumnIndex: widget.sortColumnIndex,
+                sortAscending: widget.sortAscending,
+                onSelectAll: widget.onSelectAll,
+                // Make sure no decoration is set on the DataTable
+                // from the theme, as its already wrapped in a Card.
+                dataRowHeight: widget.dataRowHeight,
+                headingRowHeight: widget.headingRowHeight,
+                horizontalMargin: widget.horizontalMargin,
+                columnSpacing: widget.columnSpacing,
+                showCheckboxColumn: widget.showCheckboxColumn,
+                showBottomBorder: true,
+                rows: _getRows(_firstRowIndex, widget.rowsPerPage),
+              ),
+            ),
+          ),
+          DefaultTextStyle(
+            style: footerTextStyle!,
+            child: IconTheme.merge(
+              data: const IconThemeData(
+                opacity: 0.54,
+              ),
+              child: SizedBox(
+                height: 56.0,
+                child: SingleChildScrollView(
+                  dragStartBehavior: widget.dragStartBehavior,
+                  scrollDirection: Axis.horizontal,
+                  reverse: true,
+                  child: Row(
+                    children: footerWidgets,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double get _startPadding {
     var startPadding = 24.0;
     if (_selectedRowCount == 0 && widget.header != null) {
-      headerWidgets.add(Expanded(child: widget.header!));
       if (widget.header is ButtonBar) {
         // We adjust the padding when a button bar is present, because the
         // ButtonBar introduces 2 pixels of outside padding, plus 2 pixels
@@ -483,6 +571,15 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
         // inside of the button to line up with the 24.0 left inset.
         startPadding = 12.0;
       }
+    }
+    return startPadding;
+  }
+
+  List<Widget> _buildHeaders() {
+    final localizations = MaterialLocalizations.of(context);
+    final headerWidgets = <Widget>[];
+    if (_selectedRowCount == 0 && widget.header != null) {
+      headerWidgets.add(Expanded(child: widget.header!));
     } else if (widget.header != null) {
       headerWidgets.add(Expanded(
         child: Text(localizations.selectedRowCountTitle(_selectedRowCount)),
@@ -499,13 +596,17 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
         }).toList(),
       );
     }
+    return headerWidgets;
+  }
 
-    // FOOTER
+  List<Widget> _buildFooters() {
+    final localizations = MaterialLocalizations.of(context);
+    final themeData = Theme.of(context);
     final footerTextStyle = themeData.textTheme.caption;
     final footerWidgets = <Widget>[];
     if (widget.onRowsPerPageChanged != null) {
       final List<Widget> availableRowsPerPage =
-          widget.availableRowsPerPage.map<DropdownMenuItem<int>>((int value) {
+      widget.availableRowsPerPage.map<DropdownMenuItem<int>>((int value) {
         return DropdownMenuItem<int>(
           value: value,
           key: ValueKey('opt_$value'),
@@ -588,89 +689,6 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
         ),
       Container(width: 14.0),
     ]);
-    return Card(
-      semanticContainer: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (headerWidgets.isNotEmpty)
-            Semantics(
-              container: true,
-              child: DefaultTextStyle(
-                // These typographic styles aren't quite the regular ones. We pick the closest ones from the regular
-                // list and then tweak them appropriately.
-                // See https://material.io/design/components/data-tables.html#tables-within-cards
-                style: _selectedRowCount > 0
-                    ? themeData.textTheme.subtitle1!
-                        .copyWith(color: themeData.colorScheme.secondary)
-                    : themeData.textTheme.headline6!
-                        .copyWith(fontWeight: FontWeight.w400),
-                child: IconTheme.merge(
-                  data: const IconThemeData(
-                    opacity: 0.54,
-                  ),
-                  child: Ink(
-                    height: 64.0,
-                    color: _selectedRowCount > 0
-                        ? themeData.secondaryHeaderColor
-                        : null,
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(
-                          start: startPadding, end: 14.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: headerWidgets,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            dragStartBehavior: widget.dragStartBehavior,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                key: _tableKey,
-                columns: widget.columns,
-                sortColumnIndex: widget.sortColumnIndex,
-                sortAscending: widget.sortAscending,
-                onSelectAll: widget.onSelectAll,
-                // Make sure no decoration is set on the DataTable
-                // from the theme, as its already wrapped in a Card.
-                decoration: const BoxDecoration(),
-                dataRowHeight: widget.dataRowHeight,
-                headingRowHeight: widget.headingRowHeight,
-                horizontalMargin: widget.horizontalMargin,
-                columnSpacing: widget.columnSpacing,
-                showCheckboxColumn: widget.showCheckboxColumn,
-                showBottomBorder: true,
-                rows: _getRows(_firstRowIndex, widget.rowsPerPage),
-              ),
-            ),
-          ),
-          DefaultTextStyle(
-            style: footerTextStyle!,
-            child: IconTheme.merge(
-              data: const IconThemeData(
-                opacity: 0.54,
-              ),
-              child: SizedBox(
-                height: 56.0,
-                child: SingleChildScrollView(
-                  dragStartBehavior: widget.dragStartBehavior,
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  child: Row(
-                    children: footerWidgets,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return footerWidgets;
   }
 }
