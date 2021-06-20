@@ -544,7 +544,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
               child: DataTable(
                 decoration: widget.tableDecoration,
                 headingRowColor: MaterialStateColor.resolveWith(
-                    (_) => widget.headingColor ?? Colors.transparent),
+                        (_) => widget.headingColor ?? Colors.transparent),
                 columns: widget.columns,
                 sortColumnIndex: widget.sortColumnIndex,
                 sortAscending: widget.sortAscending,
