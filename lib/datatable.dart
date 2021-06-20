@@ -59,38 +59,39 @@ class AdvancedPaginatedDataTable extends StatefulWidget {
   /// Themed by [DataTableTheme]. [DataTableThemeData.decoration] is ignored.
   /// To modify the border or background color of the [PaginatedDataTable], use
   /// [CardTheme], since a [Card] wraps the inner [DataTable].
-  AdvancedPaginatedDataTable({
-    Key? key,
-    this.header,
-    this.actions,
-    required this.columns,
-    required this.getRow,
-    this.sortColumnIndex,
-    this.sortAscending = true,
-    this.onSelectAll,
-    this.dataRowHeight = kMinInteractiveDimension,
-    this.headingRowHeight = 56.0,
-    this.horizontalMargin = 24.0,
-    this.columnSpacing = 56.0,
-    this.showCheckboxColumn = true,
-    this.showFirstLastButtons = false,
-    this.initialFirstRowIndex = 0,
-    this.onPageChanged,
-    this.rowsPerPage = defaultRowsPerPage,
-    this.availableRowsPerPage = const <int>[
-      defaultRowsPerPage,
-      defaultRowsPerPage * 2,
-      defaultRowsPerPage * 5,
-      defaultRowsPerPage * 10
-    ],
-    this.onRowsPerPageChanged,
-    this.dragStartBehavior = DragStartBehavior.start,
-    required this.source,
-    this.checkboxHorizontalMargin,
-    this.addEmptyRows = true,
-    this.loadingWidget,
-    this.errorWidget,
-  })  : assert(actions == null || header != null),
+  AdvancedPaginatedDataTable(
+      {Key? key,
+      this.header,
+      this.actions,
+      required this.columns,
+      required this.getRow,
+      this.sortColumnIndex,
+      this.sortAscending = true,
+      this.onSelectAll,
+      this.dataRowHeight = kMinInteractiveDimension,
+      this.headingRowHeight = 56.0,
+      this.horizontalMargin = 24.0,
+      this.columnSpacing = 56.0,
+      this.showCheckboxColumn = true,
+      this.showFirstLastButtons = false,
+      this.initialFirstRowIndex = 0,
+      this.onPageChanged,
+      this.rowsPerPage = defaultRowsPerPage,
+      this.availableRowsPerPage = const <int>[
+        defaultRowsPerPage,
+        defaultRowsPerPage * 2,
+        defaultRowsPerPage * 5,
+        defaultRowsPerPage * 10
+      ],
+      this.onRowsPerPageChanged,
+      this.dragStartBehavior = DragStartBehavior.start,
+      required this.source,
+      this.checkboxHorizontalMargin,
+      this.addEmptyRows = true,
+      this.loadingWidget,
+      this.errorWidget,
+      this.headingColor, this.tableDecoration, this.footerDecoration})
+      : assert(actions == null || header != null),
         assert(columns.isNotEmpty),
         assert(sortColumnIndex == null ||
             (sortColumnIndex >= 0 && sortColumnIndex < columns.length)),
@@ -201,6 +202,12 @@ class AdvancedPaginatedDataTable extends StatefulWidget {
   /// The value is the index of the first row on the currently displayed page.
   final ValueChanged<int>? onPageChanged;
 
+  final Color? headingColor;
+
+  final Decoration? tableDecoration;
+
+  final Decoration? footerDecoration;
+
   /// The number of rows to show on each page.
   ///
   /// See also:
@@ -292,7 +299,8 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   }
 
   void refreshCurrentPageListener() {
-    refreshCurrentPageStreamSub = widget.source.refreshCurrentPageStream.listen((event) {
+    refreshCurrentPageStreamSub =
+        widget.source.refreshCurrentPageStream.listen((event) {
       setState(() {
         setLoadNextPage(firstRowIndex: _firstRowIndex);
         _rows.clear();
@@ -437,10 +445,11 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   @override
   Widget build(BuildContext context) {
     //Adjusted to first request the data followed by rendering the original table
-    final loadingWidget = widget.loadingWidget != null ?
-       widget.loadingWidget!() :  Center(
-        child: CircularProgressIndicator(),
-      );
+    final loadingWidget = widget.loadingWidget != null
+        ? widget.loadingWidget!()
+        : Center(
+            child: CircularProgressIndicator(),
+          );
 
     return LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
@@ -455,7 +464,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
               alignment: Alignment.center,
               children: [
                 buildTableWhenReady(constraints, shouldClearRow: isDone),
-                if(isWaiting)loadingWidget
+                if (isWaiting) loadingWidget
               ],
             );
           } else {
@@ -478,60 +487,64 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
   }
 
   ///Original build method from the Flutter PaginatedDataTable
-  Widget buildTableWhenReady(BoxConstraints constraints, {bool shouldClearRow = false}) {
+  Widget buildTableWhenReady(BoxConstraints constraints,
+      {bool shouldClearRow = false}) {
     final themeData = Theme.of(context);
     final footerTextStyle = themeData.textTheme.caption;
-    if(shouldClearRow) {
+    if (shouldClearRow) {
       _rows.clear();
     }
     assert(debugCheckHasMaterialLocalizations(context));
     final headerWidgets = _buildHeaders();
     final footerWidgets = _buildFooters();
-    return Card(
-      key: ValueKey(tableKey),
-      semanticContainer: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (headerWidgets.isNotEmpty)
-            Semantics(
-              container: true,
-              child: DefaultTextStyle(
-                // These typographic styles aren't quite the regular ones. We pick the closest ones from the regular
-                // list and then tweak them appropriately.
-                // See https://material.io/design/components/data-tables.html#tables-within-cards
-                style: _selectedRowCount > 0
-                    ? themeData.textTheme.subtitle1!
-                        .copyWith(color: themeData.colorScheme.secondary)
-                    : themeData.textTheme.headline6!
-                        .copyWith(fontWeight: FontWeight.w400),
-                child: IconTheme.merge(
-                  data: const IconThemeData(
-                    opacity: 0.54,
-                  ),
-                  child: Ink(
-                    height: 64.0,
-                    color: _selectedRowCount > 0
-                        ? themeData.secondaryHeaderColor
-                        : null,
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(
-                          start: _startPadding, end: 14.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: headerWidgets,
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (headerWidgets.isNotEmpty)
+          Semantics(
+            container: true,
+            child: DefaultTextStyle(
+              // These typographic styles aren't quite the regular ones. We pick the closest ones from the regular
+              // list and then tweak them appropriately.
+              // See https://material.io/design/components/data-tables.html#tables-within-cards
+              style: _selectedRowCount > 0
+                  ? themeData.textTheme.subtitle1!
+                      .copyWith(color: themeData.colorScheme.secondary)
+                  : themeData.textTheme.headline6!
+                      .copyWith(fontWeight: FontWeight.w400),
+              child: IconTheme.merge(
+                data: const IconThemeData(
+                  opacity: 0.54,
+                ),
+                child: Ink(
+                  height: 64.0,
+                  color: _selectedRowCount > 0
+                      ? themeData.secondaryHeaderColor
+                      : null,
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.only(
+                        start: _startPadding, end: 14.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: headerWidgets,
                     ),
                   ),
                 ),
               ),
             ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            dragStartBehavior: widget.dragStartBehavior,
+          ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          dragStartBehavior: widget.dragStartBehavior,
+          child: Theme(
+            data:
+                Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ConstrainedBox(
               constraints: BoxConstraints(minWidth: constraints.maxWidth),
               child: DataTable(
+                decoration: widget.tableDecoration,
+                headingRowColor: MaterialStateColor.resolveWith(
+                    (_) => widget.headingColor ?? Colors.transparent),
                 columns: widget.columns,
                 sortColumnIndex: widget.sortColumnIndex,
                 sortAscending: widget.sortAscending,
@@ -548,27 +561,28 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
               ),
             ),
           ),
-          DefaultTextStyle(
-            style: footerTextStyle!,
-            child: IconTheme.merge(
-              data: const IconThemeData(
-                opacity: 0.54,
-              ),
-              child: SizedBox(
-                height: 56.0,
-                child: SingleChildScrollView(
-                  dragStartBehavior: widget.dragStartBehavior,
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  child: Row(
-                    children: footerWidgets,
-                  ),
+        ),
+        DefaultTextStyle(
+          style: footerTextStyle!,
+          child: IconTheme.merge(
+            data: const IconThemeData(
+              opacity: 0.54,
+            ),
+            child: Container(
+              decoration: widget.footerDecoration,
+              height: 56.0,
+              child: SingleChildScrollView(
+                dragStartBehavior: widget.dragStartBehavior,
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                child: Row(
+                  children: footerWidgets,
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -618,7 +632,7 @@ class PaginatedDataTableState extends State<AdvancedPaginatedDataTable> {
     final footerWidgets = <Widget>[];
     if (widget.onRowsPerPageChanged != null) {
       final List<Widget> availableRowsPerPage =
-      widget.availableRowsPerPage.map<DropdownMenuItem<int>>((int value) {
+          widget.availableRowsPerPage.map<DropdownMenuItem<int>>((int value) {
         return DropdownMenuItem<int>(
           value: value,
           key: ValueKey('opt_$value'),
